@@ -170,7 +170,7 @@ func RunTests(ctx context.Context, executor Executor, tests []*Spec) (res Result
 			log.WithField("step", i).WithField("command", tst.Command).Infof("testing \"%s\"", tst.Desc)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		r := tst.Run(ctx, executor)
 		results = append(results, r)
 		cancel()

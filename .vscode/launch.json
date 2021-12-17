@@ -13,7 +13,7 @@
                 "unix:///run/buildkit/buildkitd.sock",
                 "--no-cache",
                 "--context",
-                "example",
+                "../dazzle-rewrite",
                 "localhost:5000/dazzle",
                 "."
             ]
@@ -29,7 +29,7 @@
                 "--addr",
                 "unix:///run/buildkit/buildkitd.sock",
                 "--context",
-                "example",
+                "../dazzle-rewrite",
                 "localhost:5000/dazzle",
                 "--all",
                 "."

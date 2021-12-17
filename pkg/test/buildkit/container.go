@@ -2,15 +2,19 @@ package buildkit
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/containerd/console"
 	"github.com/gitpod-io/dazzle/pkg/test"
 	"github.com/gitpod-io/dazzle/pkg/test/runner"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
+	"github.com/moby/buildkit/util/progress/progressui"
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -70,12 +74,27 @@ func (b *Executor) Run(ctx context.Context, spec *test.Spec) (rr *test.RunResult
 		rchan        = make(chan []byte, 1)
 	)
 	defer cancel()
+	start := time.Now()
 	eg.Go(func() error {
 		_, err := b.cl.Solve(bctx, def, client.SolveOpt{
 			Session: []session.Attachable{
 				authprovider.NewDockerAuthProvider(os.Stderr),
 			},
 		}, ch)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		// this is temporary, so that we can observe interactions with buildkit
+		// https://github.com/moby/buildkit/blob/master/examples/build-using-dockerfile/main.go#L105-L111
+		var c console.Console
+		if cn, err := console.ConsoleFromFile(os.Stderr); err == nil {
+			c = cn
+		}
+		// not using shared context to not disrupt display but let is finish reporting errors
+		err = progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, ch)
 		if err != nil {
 			return err
 		}
@@ -90,6 +109,9 @@ func (b *Executor) Run(ctx context.Context, spec *test.Spec) (rr *test.RunResult
 		for {
 			select {
 			case cs, ok := <-ch:
+				// we don't get here, because it takes too long to extract the test image
+				timeSince := fmt.Sprintf("%.2fs", time.Since(start).Seconds())
+				log.WithField("waiting", timeSince).Debug("received test run output")
 				if !ok {
 					return nil
 				}
@@ -101,6 +123,7 @@ func (b *Executor) Run(ctx context.Context, spec *test.Spec) (rr *test.RunResult
 				return nil
 			}
 		}
+
 	})
 	err = eg.Wait()
 	if err != nil {
